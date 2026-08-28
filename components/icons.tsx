@@ -191,6 +191,33 @@ export const Clock = ({ className }: P) => (
   </Svg>
 );
 
+export const Check = ({ className }: P) => (
+  <Svg className={className}>
+    <path d="M4 12.5l5 5L20 6.5" />
+  </Svg>
+);
+
+export const Undo = ({ className }: P) => (
+  <Svg className={className}>
+    <path d="M9 14L4 9l5-5" />
+    <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
+  </Svg>
+);
+
+export const Search = ({ className }: P) => (
+  <Svg className={className}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="M16.5 16.5L21 21" />
+  </Svg>
+);
+
+export const Download = ({ className }: P) => (
+  <Svg className={className}>
+    <path d="M12 4v11m0 0l-4-4m4 4l4-4" />
+    <path d="M5 19h14" />
+  </Svg>
+);
+
 /** The red PDF chit used on uploaded file rows. */
 export function PdfMark({ className }: P) {
   return (

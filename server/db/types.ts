@@ -1,3 +1,4 @@
+import { resolve } from "@/lib/review";
 import type {
   AssessmentRecord,
   AssessmentSummary,
@@ -68,7 +69,11 @@ export class BadRequestError extends Error {
  * summaries and the list looks the same whichever one is active.
  */
 export function summarise(r: AssessmentRecord): AssessmentSummary {
-  const answeredCount = r.mappings.filter((m) => m.answerBlockId).length;
+  // Through the resolver, never off the raw record. A mark the teacher changed
+  // has to reach the class average and the history row, or the workspace and
+  // the boards would quietly disagree about the same script.
+  const { grades, mappings, orphanBlockIds } = resolve(r);
+  const answeredCount = mappings.filter((m) => m.answerBlockId).length;
 
   return {
     id: r.id,
@@ -84,9 +89,9 @@ export function summarise(r: AssessmentRecord): AssessmentSummary {
     questionCount: r.questions.length,
     answeredCount,
     unansweredCount: Math.max(0, r.questions.length - answeredCount),
-    orphanCount: r.orphanBlockIds.length,
-    awarded: r.grades.reduce((s, g) => s + (g.awarded ?? 0), 0),
-    outOf: r.grades.reduce((s, g) => s + (g.max ?? 0), 0),
+    orphanCount: orphanBlockIds.length,
+    awarded: grades.reduce((n, g) => n + (g.awarded ?? 0), 0),
+    outOf: grades.reduce((n, g) => n + (g.max ?? 0), 0),
     answerPageCount: r.answerPages.length,
   };
 }

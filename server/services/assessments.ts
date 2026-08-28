@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { repo, NotFoundError } from "../db";
+import { repo, BadRequestError, NotFoundError } from "../db";
 import { freshJob } from "@/lib/job";
 import type {
   AssessmentRecord,
@@ -7,6 +7,7 @@ import type {
   PageKind,
   PageMeta,
   RenderedPage,
+  Review,
 } from "@/lib/types";
 
 /**
@@ -114,6 +115,108 @@ export async function updateDetails(
   if (Object.keys(patch).length === 0) return requireAssessment(id);
 
   return repo().update(id, patch);
+}
+
+/**
+ * Records a teacher's correction to one question, or removes it.
+ *
+ * The model's grade and mapping are left exactly as they were. This only adds
+ * the teacher's word beside them, which is what lets the workspace show both
+ * and lets "revert" be a deletion rather than a guess at what the model
+ * originally said.
+ *
+ * Validated against the record rather than trusted: a mark above what the
+ * question is worth, or a reassignment naming a block that is not on this
+ * sheet, is a bug in the caller and is refused here rather than stored and
+ * quietly repaired on every subsequent read.
+ */
+export interface ReviewInput {
+  questionId: unknown;
+  awarded?: unknown;
+  note?: unknown;
+  answerBlockId?: unknown;
+}
+
+const MAX_NOTE = 600;
+
+export async function saveReview(id: string, input: ReviewInput): Promise<AssessmentRecord> {
+  await repo().init();
+  const record = await requireAssessment(id);
+
+  const questionId = String(input.questionId ?? "");
+  const question = record.questions.find((q) => q.id === questionId);
+  if (!question) throw new BadRequestError("That question is not on this paper.");
+
+  const grade = record.grades.find((g) => g.questionId === questionId) ?? null;
+  const max = grade?.max ?? question.marks ?? null;
+
+  /* ---- the mark ---- */
+
+  let awarded: number | null = null;
+  if (input.awarded !== undefined && input.awarded !== null && input.awarded !== "") {
+    const n = Number(input.awarded);
+    if (!Number.isFinite(n)) throw new BadRequestError("That mark is not a number.");
+    if (n < 0) throw new BadRequestError("A mark cannot be negative.");
+    if (max !== null && max > 0 && n > max) {
+      throw new BadRequestError(`This question is worth ${max}, so ${n} is more than it carries.`);
+    }
+    // Halves are how marking actually works; anything finer is a slip.
+    awarded = Math.round(n * 2) / 2;
+  }
+
+  /* ---- the note ---- */
+
+  const note = cleanNote(input.note);
+
+  /* ---- the reassignment ---- */
+
+  let answerBlockId: string | null | undefined;
+  if ("answerBlockId" in input && input.answerBlockId !== undefined) {
+    if (input.answerBlockId === null || input.answerBlockId === "") {
+      answerBlockId = null;
+    } else {
+      const blockId = String(input.answerBlockId);
+      if (!record.blocks.some((b) => b.id === blockId)) {
+        throw new BadRequestError("That answer is not on this sheet.");
+      }
+      answerBlockId = blockId;
+    }
+  }
+
+  const others = (record.reviews ?? []).filter((r) => r.questionId !== questionId);
+
+  // A review that says nothing is a revert, not a record. Storing one would put
+  // an "edited by you" badge on a row the teacher only opened and closed.
+  if (awarded === null && note === null && answerBlockId === undefined) {
+    return repo().update(id, { reviews: others });
+  }
+
+  const review: Review = {
+    questionId,
+    awarded,
+    note,
+    ...(answerBlockId !== undefined ? { answerBlockId } : {}),
+    at: new Date().toISOString(),
+  };
+
+  return repo().update(id, { reviews: [...others, review] });
+}
+
+/** Drops one correction, handing the question back to the model's own verdict. */
+export async function clearReview(id: string, questionId: string): Promise<AssessmentRecord> {
+  await repo().init();
+  const record = await requireAssessment(id);
+
+  const remaining = (record.reviews ?? []).filter((r) => r.questionId !== questionId);
+  if (remaining.length === (record.reviews ?? []).length) return record;
+
+  return repo().update(id, { reviews: remaining });
+}
+
+function cleanNote(raw: unknown): string | null {
+  if (raw === null || raw === undefined) return null;
+  const t = String(raw).replace(/[ \t]+/g, " ").trim();
+  return t ? t.slice(0, MAX_NOTE) : null;
 }
 
 export async function deleteAssessment(id: string): Promise<void> {

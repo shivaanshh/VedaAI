@@ -111,7 +111,13 @@ export interface AnswerBlock {
 /* Mapping and grading                                                 */
 /* ------------------------------------------------------------------ */
 
-export type MatchMethod = "label" | "semantic" | "none";
+/**
+ * How a question came to be paired with an answer.
+ *
+ * "teacher" outranks the other three: it means a human looked at the sheet and
+ * said so, which is the only kind of match this app never second-guesses.
+ */
+export type MatchMethod = "label" | "semantic" | "none" | "teacher";
 
 export interface Mapping {
   questionId: string;
@@ -129,6 +135,42 @@ export interface Grade {
   max: number | null;
   verdict: Verdict;
   feedback: string;
+}
+
+/**
+ * What a teacher changes after reading what the model decided.
+ *
+ * The model's own grade and mapping are never overwritten. A review sits beside
+ * them and is applied on read, which is what makes an override explainable —
+ * the screen can show what the model said and what the teacher said — and
+ * undoable, by dropping the review rather than by trying to reconstruct a
+ * number that was thrown away.
+ *
+ * It also keeps provenance straight. Marks a human set and marks a model set
+ * are different kinds of fact, and a marking tool that blurs them is lying
+ * about how the marks came to be. Resolution lives in lib/review.ts.
+ */
+export interface Review {
+  questionId: string;
+  /**
+   * Marks the teacher awarded, or null when they changed something else and
+   * left the number alone. Null is not zero: a note-only review must not
+   * silently wipe the mark it was commenting on.
+   */
+  awarded: number | null;
+  /** The teacher's reasoning. Shown alongside the model's feedback, not instead of it. */
+  note: string | null;
+  /**
+   * Which answer the teacher says belongs to this question.
+   *
+   * Three states, and they are all distinct:
+   *   undefined — leave the matcher's decision alone
+   *   a block id — the matcher picked the wrong answer, use this one
+   *   null — nothing on the sheet answers this, whatever the matcher thought
+   */
+  answerBlockId?: string | null;
+  /** When it was set, so the rail can say the marks were changed and when. */
+  at: string;
 }
 
 /** The analytical result, independent of how it was stored or produced. */
@@ -221,6 +263,13 @@ export interface AssessmentRecord extends Assessment, Filing {
   job: JobState;
   questionPages: PageMeta[];
   answerPages: PageMeta[];
+  /**
+   * Corrections the teacher made to what the model decided. See lib/review.ts.
+   *
+   * Optional because records written before marking was editable simply have
+   * no such key, so every reader normalises through `?? []`.
+   */
+  reviews?: Review[];
 }
 
 /**

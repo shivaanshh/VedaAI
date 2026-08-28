@@ -1,3 +1,4 @@
+import { resolve } from "./review";
 import type { AssessmentRecord } from "./types";
 
 /**
@@ -87,7 +88,10 @@ function summariseExam(runs: AssessmentRecord[]): Exam {
   const questions = new Map<string, ExamQuestion>();
 
   for (const run of ordered) {
-    const gradeFor = new Map(run.grades.map((g) => [g.questionId, g]));
+    // Teacher corrections first. A mark raised in the workspace has to move the
+    // question that mark belongs to, otherwise the board would keep naming a
+    // question the class has already been shown to be fine on.
+    const gradeFor = new Map(resolve(run).grades.map((g) => [g.questionId, g]));
 
     for (const q of run.questions) {
       // Falls back to the printed number so a question that canonicalised to

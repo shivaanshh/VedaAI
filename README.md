@@ -14,6 +14,9 @@ Click a question on the left; the answer lights up on the right.
 - [Architecture](#architecture)
 - [How it works](#how-it-works)
 - [Two views, no login](#two-views-no-login)
+- [The teacher overrules the model](#the-teacher-overrules-the-model)
+- [Finding one question in a long paper](#finding-one-question-in-a-long-paper)
+- [Taking the marks out of the app](#taking-the-marks-out-of-the-app)
 - [Edge cases](#edge-cases)
 - [Running it](#running-it)
 - [Deploying](#deploying)
@@ -256,6 +259,10 @@ record:
 | Questions in printed order, marks, AI feedback | yes | yes |
 | Click a question, highlight the exact region | yes | yes |
 | Unanswered questions, unmatched writing | yes | yes |
+| Change a mark, move an answer, leave a note | yes | no |
+| Read the teacher's note on a question | yes | yes |
+| Search and filter the question list | yes | yes |
+| Export the marks as CSV | yes | no |
 | Match-confidence notes | yes | no |
 | Other students' scripts, dashboard, library | yes | no chrome to reach them |
 
@@ -272,6 +279,68 @@ to change: the student view already reads one record and exposes no route to ano
 The student view also refuses to drive the job. Marking is the teacher's run; a student
 refreshing a half-finished result should not be spending the school's model quota, so they see
 *Still being marked* and a manual check-again button instead.
+
+## The teacher overrules the model
+
+A marking tool the teacher cannot argue with is a marking tool the teacher will not sign. So
+every question carries a **Change mark** control: quick buttons for zero, half and full, a number
+box for anything between, a note the student will read, and a dropdown to say *this answer over
+here is the one that belongs to this question* — or that nothing on the sheet answers it at all.
+One click of **Undo** puts the model's own verdict back.
+
+**The correction is stored beside the model's grade, never over it.** A `Review` records what the
+teacher decided; the model's `Grade` and `Mapping` stay exactly as they were. A single function,
+`resolve()` in `lib/review.ts`, lays the corrections over the model's output on the way out of
+storage.
+
+That indirection is the whole design, and it buys three things:
+
+- **The override is reversible.** Nothing was destroyed, so undo is a delete, not a repair.
+- **The override is explainable.** The editor can say *the model gave 0.5 of 2* while showing the
+  2 that now stands, because both numbers still exist.
+- **The override cannot disagree with itself.** Marks are summed in four places — the history
+  card, *My Classroom* and *Assignments*, the per-question *Exams* board, and the student's own
+  copy. All four read through `resolve()`. A correction that reached the screen but not the boards
+  would be worse than no correction at all: two totals, neither obviously wrong.
+
+Reassignment recomputes rather than patches. *Unmatched writing* is defined as every block no
+mapping claims, so moving an answer onto a question removes it from the orphan list by the same
+rule that put it there, and detaching one puts it back. There is no second list to keep in step.
+
+The server is the authority on what a mark may be. A mark above what the question carries is
+refused with the number it carries, a negative mark is refused, a question that is not on the
+paper is refused, and an answer block that is not on this sheet is refused. Marks are rounded to
+halves, notes are capped, and a save that changes nothing deletes the correction instead of
+storing an empty one. The response is the whole updated record, so the client never adds up
+marks itself.
+
+## Finding one question in a long paper
+
+Below eight questions, a search box is clutter. At eight and above the rail grows a toolbar: a
+search field that reads question text *and the transcribed answer*, so a teacher who remembers
+what the student wrote can find it without remembering the number; and filter chips for
+**Unanswered**, **Needs a look**, **Marks lost** and **Marked by you**.
+
+Each chip carries its own count and only appears when that count is not zero — a chip reading
+*Needs a look 0* is an invitation to click something that does nothing. Clicking the active chip
+clears it. Filtering hides rows without reordering them, so question 9 is still below question 4
+in the narrowed list; printed order is a property of the paper, not of the current view.
+
+## Taking the marks out of the app
+
+Marks end up in a spreadsheet or a school system, so **Export CSV** sits on the workspace toolbar
+for one script and inside each open panel on *Exams* for a whole paper.
+
+The file is written for the program that will actually open it. A UTF-8 BOM leads, so Excel does
+not mangle names outside ASCII. Quotes are doubled and rows end `\r\n`, per RFC 4180. Cells
+beginning `=`, `+`, `-` or `@` are prefixed with an apostrophe, because the cells hold
+transcribed handwriting and a student who wrote `=2+2` should not have it evaluated on the
+teacher's machine. Filenames drop the characters Windows refuses, and a script nobody has filed
+still produces a file rather than a name that is only an extension.
+
+Rows come out in printed order with the mark that now stands, and a column saying whether it was
+the teacher's or the model's — so the export answers the question a marks sheet is usually asked
+to answer.
 
 ## Edge cases
 
@@ -291,11 +360,12 @@ Every requirement in the brief, and where it is handled:
 | Answers spanning pages | `regions[]` is an array; blocks split across a request batch are rejoined by label, and the viewer scrolls to the first region so the teacher lands at the start of the answer. |
 | Processing progress | Real per-batch progress, not a timed animation — the bar advances when a batch the server actually finished is written to the job record. |
 | A run interrupted part way | The job is persisted, so reloading `/a/<id>` resumes at the step it reached. A failure keeps everything extracted before it and offers *Resume from where it stopped*. |
+| The model marks something wrong | The teacher overrules it — mark, mapping or both — and the correction reaches the history card, both boards, the exam analysis and the student's copy at once, because all five resolve through one function. |
 | The same run open twice | An in-process mutex plus a persisted lease claim; the second caller sees no movement and waits instead of duplicating a batch. |
 
 ### Tests
 
-The logic that has to be right every time is covered by 151 assertions that need no API key and
+The logic that has to be right every time is covered by 207 assertions that need no API key and
 no network:
 
 ```bash
@@ -319,6 +389,8 @@ and not counted against the other, that a question with no grade at all reports 
 rather than a zero, and that rows come out in printed order however they were stored. Alongside
 them sit the run-state rules, which decide whether a run that is not finished is still working,
 has stopped, or was abandoned before a single page was ever uploaded.
+
+The corrections are covered hardest, because they are the one place a wrong answer would be the teacher's rather than the model's: that a script nobody has corrected comes back byte for byte as the model left it, that a mark above what a question carries is clamped rather than stored as given, that a note on its own does not disturb a mark, that moving an answer removes it from the orphan list and detaching one puts it back, that a review naming a block that no longer exists is ignored rather than obeyed, that verdicts are recomputed from the mark that now stands, and that a correction reaches the per-question board and not only the screen. Beside them sit the export rules: quote doubling, the formula guard, printed order, and filenames a filesystem will accept.
 
 Two of these guards exist because the test caught the bug. The roman-numeral guard stops `(iii)`
 becoming the number 111. And the mid-label repair exists because `canonicalize` splits digit runs
@@ -405,6 +477,7 @@ app/
         pages/[kind]/[index]/ GET the stored bytes, immutably cached
         advance/              POST one unit of work
         retry/                POST to resume a failed run
+        review/               PUT a teacher correction, DELETE to undo it
 
 server/                       server-only; never imported by the client
   http.ts                     JSON responses and error-to-status mapping
@@ -435,6 +508,9 @@ lib/                          shared by both sides; no I/O, no secrets
   display.ts                  question refs, score chips, relative times
   cohort.ts                   groups runs by student or paper and totals them
   exam.ts                     per-question totals across scripts of one paper
+  review.ts                   lays teacher corrections over the model's output
+  csv.ts                      export formatting; the Excel hazards, handled
+  download.ts                 hands the browser a file; the only DOM part of export
   profile.ts                  the display identity kept on this browser
 
 components/
@@ -448,9 +524,10 @@ components/
   Workspace.tsx               drives the run, then renders the result
   StudentView.tsx             the read-only result, minimal chrome
   QuestionRail.tsx            question list, statuses, orphans; audience-aware
+  MarkEditor.tsx              change a mark, move an answer, leave a note
   SheetViewer.tsx             page stack, overlay, zoom, scroll-to-answer
 
-tests/run.cjs                 151 logic assertions, no network needed
+tests/run.cjs                 207 logic assertions, no network needed
 scripts/copy-pdf-worker.mjs   puts the pdf.js worker at a stable URL
 ```
 
@@ -659,7 +736,7 @@ repository interface with two drivers — filesystem by default so the project c
 with no infrastructure, Postgres when `DATABASE_URL` is set — so past scripts stay in a library
 instead of vanishing on refresh. The same record is read by two views — the teacher workspace
 that drives the marking, and a read-only student result the teacher shares — so the roles differ
-in capability rather than behind a login the brief rules out.
+in capability rather than behind a login the brief rules out. Because a marking tool the teacher cannot argue with will not be trusted, every mark and every match can be overruled, with the correction stored beside the model output rather than over it, so the change is reversible and every total in the app resolves through one function.
 
 **Model.** Google Gemini (`gemini-3.6-flash` by default, configurable via `GEMINI_MODEL`).
 Chosen because it does handwriting transcription *and* returns bounding boxes in a single call —

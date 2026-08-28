@@ -8,13 +8,20 @@ import SheetViewer from "./SheetViewer";
 import Shell from "./Shell";
 import {
   advanceAssessment,
+  clearReview,
   fetchAssessment,
   retryAssessment,
+  saveReview,
   toPageRefs,
   updateAssessment,
 } from "@/lib/api";
 import { isTerminal } from "@/lib/job";
+import { resolve } from "@/lib/review";
+import { filename, scriptCSV } from "@/lib/csv";
+import { download } from "@/lib/download";
+import { Download } from "./icons";
 import { splitRef } from "@/lib/display";
+import type { ReviewPatch } from "./MarkEditor";
 import type { AssessmentRecord } from "@/lib/types";
 
 /**
@@ -112,13 +119,26 @@ export default function Workspace({ id }: { id: string }) {
 
   const answerPages = useMemo(() => (record ? toPageRefs(record, "answer") : []), [record]);
 
+  /**
+   * The record as the teacher's corrections leave it.
+   *
+   * Everything on screen reads from here rather than from the raw record, so a
+   * mark changed in the rail moves the highlight, the running total and the
+   * chip in the same render. `record` itself still holds what the model said,
+   * which is what the editor shows the override against.
+   */
+  const view = useMemo(
+    () => (record ? resolve(record) : { grades: [], mappings: [], orphanBlockIds: [] }),
+    [record]
+  );
+
   const blockByQuestion = useMemo(() => {
     const map = new Map<string, string>();
-    for (const m of record?.mappings ?? []) {
+    for (const m of view.mappings) {
       if (m.answerBlockId) map.set(m.questionId, m.answerBlockId);
     }
     return map;
-  }, [record]);
+  }, [view]);
 
   /**
    * The tag drawn on a highlight names the QUESTION, not the block, because
@@ -130,7 +150,7 @@ export default function Workspace({ id }: { id: string }) {
     const labels: Record<string, string> = {};
     const byId = new Map((record?.questions ?? []).map((q) => [q.id, q]));
 
-    for (const m of record?.mappings ?? []) {
+    for (const m of view.mappings) {
       if (!m.answerBlockId) continue;
       const q = byId.get(m.questionId);
       if (!q) continue;
@@ -138,11 +158,11 @@ export default function Workspace({ id }: { id: string }) {
       labels[m.answerBlockId] = `Q${ref.badge}${ref.sub ? ref.sub.replace(".", "") : ""}`;
     }
 
-    for (const blockId of record?.orphanBlockIds ?? []) {
+    for (const blockId of view.orphanBlockIds) {
       labels[blockId] = "unmatched";
     }
     return labels;
-  }, [record]);
+  }, [view, record]);
 
   const activeBlockId =
     selectedOrphanId ??
@@ -154,6 +174,52 @@ export default function Workspace({ id }: { id: string }) {
     const q = record?.questions.find((x) => x.id === selectedQuestionId);
     return q ? `Nothing on this sheet answers ${q.number}.` : null;
   }, [selectedQuestionId, selectedOrphanId, blockByQuestion, record]);
+
+
+  /* -------------------------------------------------------------- */
+  /* Correcting the model                                            */
+  /* -------------------------------------------------------------- */
+
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+
+  /**
+   * The server returns the whole record, and it becomes the new state.
+   *
+   * Recomputing the totals in the browser would be faster and would eventually
+   * be wrong: the server clamps a mark to what the question is worth, and a
+   * client that had already drawn its own number would keep showing a total the
+   * database does not agree with.
+   */
+  const onSaveReview = useCallback(
+    async (questionId: string, patch: ReviewPatch) => {
+      setSavingId(questionId);
+      setReviewError(null);
+      try {
+        setRecord(await saveReview(id, { questionId, ...patch }));
+      } catch (err) {
+        setReviewError((err as Error).message);
+      } finally {
+        setSavingId(null);
+      }
+    },
+    [id]
+  );
+
+  const onClearReview = useCallback(
+    async (questionId: string) => {
+      setSavingId(questionId);
+      setReviewError(null);
+      try {
+        setRecord(await clearReview(id, questionId));
+      } catch (err) {
+        setReviewError((err as Error).message);
+      } finally {
+        setSavingId(null);
+      }
+    },
+    [id]
+  );
 
   const selectQuestion = useCallback((questionId: string) => {
     setSelectedOrphanId(null);
@@ -300,8 +366,38 @@ export default function Workspace({ id }: { id: string }) {
             record={record}
             onSaved={(next) => setRecord((r) => (r ? { ...r, ...next } : r))}
           />
+          {record.grades.length > 0 ? (
+            <button
+              type="button"
+              onClick={() =>
+                download(
+                  filename([record.student, record.paper ?? record.title]),
+                  scriptCSV({ ...record, ...view })
+                )
+              }
+              title="Download this script as a spreadsheet"
+              className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-[12px] font-semibold text-body transition-colors hover:bg-raised"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </button>
+          ) : null}
+
           <ShareLink id={id} />
         </div>
+
+        {reviewError ? (
+          <div className="flex items-start gap-2 border-b border-bad/30 bg-bad-soft/50 px-3 py-2">
+            <p className="flex-1 text-[11.5px] font-medium text-bad">{reviewError}</p>
+            <button
+              type="button"
+              onClick={() => setReviewError(null)}
+              className="shrink-0 text-[11px] font-semibold text-bad underline-offset-2 hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
 
         <div className="grid min-h-0 flex-1 gap-3 p-3 md:grid-cols-[minmax(320px,7fr)_9fr]">
           <div
@@ -311,14 +407,29 @@ export default function Workspace({ id }: { id: string }) {
             <QuestionRail
               questions={record.questions}
               blocks={record.blocks}
-              mappings={record.mappings}
-              grades={record.grades}
-              orphanBlockIds={record.orphanBlockIds}
+              mappings={view.mappings}
+              grades={view.grades}
+              orphanBlockIds={view.orphanBlockIds}
+              reviews={record.reviews ?? []}
               summary={record.summary}
               selectedQuestionId={selectedQuestionId}
               selectedOrphanId={selectedOrphanId}
               onSelectQuestion={selectQuestion}
               onSelectOrphan={selectOrphan}
+              editing={
+                // Offered once there are marks to correct. Before grading there
+                // is nothing to disagree with, and an editor on an empty rail
+                // would only invite a teacher to grade the paper by hand.
+                record.grades.length > 0
+                  ? {
+                      modelGrades: record.grades,
+                      modelMappings: record.mappings,
+                      savingId,
+                      onSave: onSaveReview,
+                      onClear: onClearReview,
+                    }
+                  : undefined
+              }
             />
           </div>
 
@@ -327,7 +438,7 @@ export default function Workspace({ id }: { id: string }) {
               pages={answerPages}
               blocks={record.blocks}
               activeBlockId={activeBlockId}
-              orphanBlockIds={record.orphanBlockIds}
+              orphanBlockIds={view.orphanBlockIds}
               blockLabels={blockLabels}
               emptyNotice={emptyNotice}
             />

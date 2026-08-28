@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "postinstall": "node scripts/copy-pdf-worker.mjs",
-    "test": "tsc lib/normalize.ts lib/mapping.ts lib/job.ts lib/types.ts lib/cohort.ts lib/display.ts lib/exam.ts server/services/lock.ts --rootDir . --outDir .test-build --module commonjs --target es2020 --skipLibCheck && node tests/run.cjs"
+    "test": "tsc lib/normalize.ts lib/mapping.ts lib/job.ts lib/types.ts lib/cohort.ts lib/display.ts lib/exam.ts lib/review.ts lib/csv.ts server/services/lock.ts --rootDir . --outDir .test-build --module commonjs --target es2020 --skipLibCheck && node tests/run.cjs"
   },
   "dependencies": {
     "next": "14.2.35",

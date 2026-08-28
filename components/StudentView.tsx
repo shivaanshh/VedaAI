@@ -5,6 +5,7 @@ import QuestionRail from "./QuestionRail";
 import SheetViewer from "./SheetViewer";
 import { fetchAssessment, toPageRefs } from "@/lib/api";
 import { isTerminal } from "@/lib/job";
+import { resolve } from "@/lib/review";
 import { splitRef } from "@/lib/display";
 import type { AssessmentRecord } from "@/lib/types";
 
@@ -50,30 +51,43 @@ export default function StudentView({ id }: { id: string }) {
 
   const answerPages = useMemo(() => (record ? toPageRefs(record, "answer") : []), [record]);
 
+  /**
+   * Corrections applied before anything is shown.
+   *
+   * A student who was given back two marks must see the two marks, not the
+   * number the model first landed on. This is the same resolver the teacher's
+   * workspace uses, so the two screens cannot report different results for the
+   * same script.
+   */
+  const view = useMemo(
+    () => (record ? resolve(record) : { grades: [], mappings: [], orphanBlockIds: [] }),
+    [record]
+  );
+
   const blockByQuestion = useMemo(() => {
     const map = new Map<string, string>();
-    for (const m of record?.mappings ?? []) {
+    for (const m of view.mappings) {
       if (m.answerBlockId) map.set(m.questionId, m.answerBlockId);
     }
     return map;
-  }, [record]);
+  }, [view]);
 
   const blockLabels = useMemo(() => {
     const labels: Record<string, string> = {};
     const byId = new Map((record?.questions ?? []).map((q) => [q.id, q]));
 
-    for (const m of record?.mappings ?? []) {
+    for (const m of view.mappings) {
       if (!m.answerBlockId) continue;
       const q = byId.get(m.questionId);
       if (!q) continue;
       const ref = splitRef(q.canonical, q.number);
       labels[m.answerBlockId] = `Q${ref.badge}${ref.sub ? ref.sub.replace(".", "") : ""}`;
     }
-    for (const blockId of record?.orphanBlockIds ?? []) {
+    for (const blockId of view.orphanBlockIds) {
       labels[blockId] = "unplaced";
     }
     return labels;
-  }, [record]);
+  }, [view, record]);
 
   const activeBlockId =
     selectedOrphanId ??
@@ -154,9 +168,9 @@ export default function StudentView({ id }: { id: string }) {
   /* The result                                                      */
   /* -------------------------------------------------------------- */
 
-  const awarded = record.grades.reduce((s, g) => s + (g.awarded ?? 0), 0);
-  const outOf = record.grades.reduce((s, g) => s + (g.max ?? 0), 0);
-  const answered = record.mappings.filter((m) => m.answerBlockId).length;
+  const awarded = view.grades.reduce((s, g) => s + (g.awarded ?? 0), 0);
+  const outOf = view.grades.reduce((s, g) => s + (g.max ?? 0), 0);
+  const answered = view.mappings.filter((m) => m.answerBlockId).length;
   const percent = outOf > 0 ? Math.round((awarded / outOf) * 100) : null;
 
   return (
@@ -191,9 +205,10 @@ export default function StudentView({ id }: { id: string }) {
               audience="student"
               questions={record.questions}
               blocks={record.blocks}
-              mappings={record.mappings}
-              grades={record.grades}
-              orphanBlockIds={record.orphanBlockIds}
+              mappings={view.mappings}
+              grades={view.grades}
+              orphanBlockIds={view.orphanBlockIds}
+              reviews={record.reviews ?? []}
               summary={record.summary}
               selectedQuestionId={selectedQuestionId}
               selectedOrphanId={selectedOrphanId}
@@ -207,7 +222,7 @@ export default function StudentView({ id }: { id: string }) {
               pages={answerPages}
               blocks={record.blocks}
               activeBlockId={activeBlockId}
-              orphanBlockIds={record.orphanBlockIds}
+              orphanBlockIds={view.orphanBlockIds}
               blockLabels={blockLabels}
               emptyNotice={emptyNotice}
             />

@@ -33,6 +33,8 @@ const { withLock } = require("../.test-build/server/services/lock.js");
 const { groupBy, percent } = require("../.test-build/lib/cohort.js");
 const { runState, RUN_STATE_LABEL, scoreChip } = require("../.test-build/lib/display.js");
 const { buildExams, hardest } = require("../.test-build/lib/exam.js");
+const { resolve, verdictFor, isEmptyReview } = require("../.test-build/lib/review.js");
+const { cell, scriptCSV, filename } = require("../.test-build/lib/csv.js");
 
 let pass = 0;
 let fail = 0;
@@ -796,6 +798,283 @@ group("exams are listed newest first:");
 
   eq(exams.map((e) => e.paper), ["New paper", "Old paper"], "most recently marked leads");
 }
+
+
+/* ------------------------------------------------------------------ *
+ * Teacher corrections
+ *
+ * The resolver is the single place a correction turns into a mark, and four
+ * separate screens trust it: the rail, the student's copy, the history summary
+ * and the per-question board. A bug here would not look like a bug — it would
+ * look like two screens quietly disagreeing about the same script — so the
+ * awkward cases are pinned down rather than assumed.
+ * ------------------------------------------------------------------ */
+
+function m(number, blockId, method, confidence) {
+  return {
+    questionId: `q-${number}`,
+    answerBlockId: blockId,
+    confidence: confidence === undefined ? 1 : confidence,
+    method: method || (blockId ? "label" : "none"),
+  };
+}
+
+function blk(id, label) {
+  return {
+    id,
+    writtenLabel: label || null,
+    canonical: null,
+    transcription: `written ${id}`,
+    regions: [],
+    order: 0,
+  };
+}
+
+function rev(number, over) {
+  return { questionId: `q-${number}`, awarded: null, note: null, at: "2026-08-26T00:00:00.000Z", ...over };
+}
+
+group("a script with no corrections is left exactly as it was:");
+{
+  const r = record({
+    questions: [q("1", 0, 5)],
+    blocks: [blk("b1")],
+    mappings: [m("1", "b1")],
+    grades: [g("1", 3, 5, "partial")],
+  });
+
+  const out = resolve(r);
+  eq(out.grades, r.grades, "the model's grades are passed through untouched");
+  eq(out.mappings, r.mappings, "so are its mappings");
+  eq(out.orphanBlockIds, [], "a claimed block is not an orphan");
+}
+
+group("the teacher raises a mark:");
+{
+  const r = record({
+    questions: [q("1", 0, 5)],
+    blocks: [blk("b1")],
+    mappings: [m("1", "b1")],
+    grades: [g("1", 2, 5, "partial")],
+    reviews: [rev("1", { awarded: 5 })],
+  });
+
+  const out = resolve(r);
+  eq(out.grades[0].awarded, 5, "the teacher's mark replaces the model's");
+  eq(out.grades[0].max, 5, "out of stays what the question is worth");
+  eq(out.grades[0].verdict, "correct", "full marks re-reads as correct, not partial");
+  eq(r.grades[0].awarded, 2, "the model's own grade is not mutated");
+}
+
+group("a mark above what the question carries is clamped, not stored as given:");
+{
+  const r = record({
+    questions: [q("1", 0, 4)],
+    blocks: [blk("b1")],
+    mappings: [m("1", "b1")],
+    grades: [g("1", 1, 4, "partial")],
+    reviews: [rev("1", { awarded: 99 })],
+  });
+
+  eq(resolve(r).grades[0].awarded, 4, "99 out of 4 resolves to 4");
+}
+
+group("a note on its own does not disturb the mark:");
+{
+  const r = record({
+    questions: [q("1", 0, 5)],
+    blocks: [blk("b1")],
+    mappings: [m("1", "b1")],
+    grades: [g("1", 3, 5, "partial")],
+    reviews: [rev("1", { note: "Method was right." })],
+  });
+
+  const out = resolve(r);
+  eq(out.grades[0].awarded, 3, "null awarded means unchanged, not zero");
+  eq(out.grades[0].verdict, "partial", "and the verdict holds");
+}
+
+group("the teacher moves an answer to the question it actually belongs to:");
+{
+  const r = record({
+    questions: [q("7", 0, 3), q("8", 1, 3)],
+    blocks: [blk("b1", "7"), blk("b2", "8")],
+    // The matcher put the same block on both, which is the failure a teacher
+    // is most likely to be correcting.
+    mappings: [m("7", "b1"), m("8", "b1", "semantic", 0.4)],
+    grades: [g("7", 3, 3, "correct"), g("8", 1, 3, "partial")],
+    reviews: [rev("8", { answerBlockId: "b2" })],
+  });
+
+  const out = resolve(r);
+  const q8 = out.mappings.find((x) => x.questionId === "q-8");
+
+  eq(q8.answerBlockId, "b2", "question 8 now points at the block the teacher chose");
+  eq(q8.method, "teacher", "and is recorded as a human decision");
+  eq(q8.confidence, 1, "which carries no uncertainty");
+  eq(out.orphanBlockIds, [], "b2 stops being an orphan the moment it is claimed");
+}
+
+group("the teacher says nothing on the sheet answers this:");
+{
+  const r = record({
+    questions: [q("3", 0, 4)],
+    blocks: [blk("b1")],
+    mappings: [m("3", "b1", "semantic", 0.3)],
+    grades: [g("3", 2, 4, "partial")],
+    reviews: [rev("3", { answerBlockId: null })],
+  });
+
+  const out = resolve(r);
+  eq(out.mappings[0].answerBlockId, null, "the pairing is broken");
+  eq(out.grades[0].awarded, 0, "marks given for an answer that was detached cannot stand");
+  eq(out.grades[0].verdict, "unanswered", "and it reads as unanswered");
+  eq(out.orphanBlockIds, ["b1"], "the freed block becomes unmatched writing");
+}
+
+group("a teacher may award marks the matcher found no answer for:");
+{
+  const r = record({
+    questions: [q("5", 0, 6)],
+    blocks: [],
+    mappings: [m("5", null)],
+    grades: [g("5", 0, 6, "unanswered")],
+    reviews: [rev("5", { awarded: 6, note: "Answered on the back page." })],
+  });
+
+  const out = resolve(r);
+  eq(out.grades[0].awarded, 6, "the teacher can see the sheet; their mark decides");
+  eq(out.grades[0].verdict, "correct", "and it is no longer unanswered");
+}
+
+group("a review naming a block that no longer exists is ignored, not obeyed:");
+{
+  const r = record({
+    questions: [q("1", 0, 5)],
+    blocks: [blk("b1")],
+    mappings: [m("1", "b1")],
+    grades: [g("1", 5, 5, "correct")],
+    reviews: [rev("1", { answerBlockId: "b-deleted" })],
+  });
+
+  eq(
+    resolve(r).mappings[0].answerBlockId,
+    "b1",
+    "a stale reassignment falls back to the matcher rather than pointing at nothing"
+  );
+}
+
+group("corrections reach the per-question board:");
+{
+  const before = record({
+    id: "s1",
+    paper: "Physics HY",
+    questions: [q("2", 0, 6)],
+    blocks: [blk("b1")],
+    mappings: [m("2", "b1")],
+    grades: [g("2", 0, 6, "incorrect")],
+  });
+
+  eq(buildExams([before])[0].questions[0].awarded, 0, "the model marked it zero");
+
+  const after = record({
+    ...before,
+    reviews: [rev("2", { awarded: 6 })],
+  });
+
+  const row = buildExams([after])[0].questions[0];
+  eq(row.awarded, 6, "and the board follows the teacher, not the model");
+  eq(row.score, 1, "so the question stops reading as the hardest on the paper");
+}
+
+group("verdicts are recomputed from the mark that now stands:");
+{
+  eq(verdictFor(0, 5, true), "incorrect", "answered and given nothing");
+  eq(verdictFor(2, 5, true), "partial", "answered and given some");
+  eq(verdictFor(5, 5, true), "correct", "answered and given all");
+  eq(verdictFor(6, 5, true), "correct", "more than all is still correct");
+  eq(verdictFor(0, 5, false), "unanswered", "nothing answered and nothing given");
+  eq(verdictFor(null, null, true), "partial", "answered but never graded");
+}
+
+group("an empty review is a revert, not a record:");
+{
+  eq(isEmptyReview({ awarded: null, note: null, answerBlockId: undefined }), true, "nothing said");
+  eq(isEmptyReview({ awarded: 0, note: null, answerBlockId: undefined }), false, "zero is a mark");
+  eq(isEmptyReview({ awarded: null, note: "x", answerBlockId: undefined }), false, "a note counts");
+  eq(
+    isEmptyReview({ awarded: null, note: null, answerBlockId: null }),
+    false,
+    "detaching an answer counts"
+  );
+}
+
+
+
+/* ------------------------------------------------------------------ *
+ * Export
+ *
+ * The file leaves the app and is opened by Excel, which is a hostile
+ * environment for text nobody vetted: a cell that starts with = is a formula,
+ * a stray quote breaks the row, and a name with a slash in it is a filename
+ * Windows refuses. All three arrive here routinely, because the cells hold
+ * transcribed handwriting and model prose.
+ * ------------------------------------------------------------------ */
+
+group("cells that would break a spreadsheet:");
+{
+  eq(cell("plain"), "plain", "ordinary text is left alone");
+  eq(cell('say "yes"'), '"say ""yes"""', "quotes are doubled and the cell wrapped");
+  eq(cell("a,b"), '"a,b"', "a comma forces quoting");
+  eq(cell("line1\nline2"), '"line1\nline2"', "so does a newline");
+  eq(cell(null), "", "nothing becomes empty, not the word null");
+  eq(cell(0), "0", "zero is a mark, not an absence");
+}
+
+group("a cell is never handed to Excel as a formula:");
+{
+  eq(cell("=2+2"), "'=2+2", "a student writing =2+2 must not be computed");
+  eq(cell("+1"), "'+1", "plus is a formula lead-in too");
+  eq(cell("-5"), "'-5", "and minus");
+  eq(cell("@sum"), "'@sum", "and at");
+  eq(cell("2+2=4"), "2+2=4", "but only at the start; ordinary maths is untouched");
+}
+
+group("a script exports one row per question, in printed order:");
+{
+  const csv = scriptCSV({
+    title: "script",
+    student: "Aarav Sharma",
+    paper: "Physics",
+    // Deliberately out of order, to prove `order` is what decides.
+    questions: [q("2", 1, 3), q("1", 0, 5)],
+    blocks: [blk("b1")],
+    mappings: [m("1", "b1")],
+    grades: [g("1", 5, 5, "correct"), g("2", 0, 3, "unanswered")],
+    reviews: [rev("1", { note: "Well argued." })],
+  });
+
+  const lines = csv.trim().split("\r\n");
+
+  // Checked before trimming: U+FEFF counts as whitespace, so .trim() would eat
+  // the very byte this asserts is present.
+  eq(csv.charCodeAt(0), 0xfeff, "a BOM leads, so Excel reads it as UTF-8");
+  eq(lines[1].split(",")[0], "1", "question 1 comes first despite being second in the array");
+  eq(lines[2].split(",")[0], "2", "and question 2 second");
+  eq(lines[1].split(",")[5], "teacher", "a corrected row is attributed to the teacher");
+  eq(lines[2].split(",")[5], "AI", "an untouched one to the model");
+  eq(lines[2].split(",")[4], "no", "an unanswered question says so");
+  eq(lines[lines.length - 1].startsWith("Total,5,8"), true, "the total is the sum of the rows");
+}
+
+group("filenames a filesystem will actually accept:");
+{
+  eq(filename(["Aarav Sharma", "Physics HY"]), "Aarav Sharma - Physics HY.csv", "joined and suffixed");
+  eq(filename([null, "Physics"]), "Physics.csv", "an unfiled script drops the empty part");
+  eq(filename(["Class IX/A: Unit 2"]), "Class IX A Unit 2.csv", "slashes and colons are stripped");
+  eq(filename([null, undefined, "  "]), "export.csv", "nothing usable still yields a file");
+}
+
 
 lockTests()
   .catch((err) => {

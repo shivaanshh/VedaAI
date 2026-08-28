@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Shell from "@/components/Shell";
-import { ChevronDown, Sparkle } from "@/components/icons";
+import { ChevronDown, Download, Sparkle } from "@/components/icons";
 import { listExams } from "@/lib/api";
 import { fmt, percent } from "@/lib/cohort";
 import { hardest, type Exam, type ExamQuestion } from "@/lib/exam";
 import { timeAgo } from "@/lib/display";
+import { examCSV, filename } from "@/lib/csv";
+import { download } from "@/lib/download";
 
 /**
  * Exams — a paper broken open, one row per question.
@@ -160,6 +162,20 @@ function ExamCard({ exam, initiallyOpen }: { exam: Exam; initiallyOpen: boolean 
 
       {open ? (
         <div className="animate-markIn border-t border-line">
+          {/* Sits inside the panel rather than in the header, because the
+              header is itself a button and a button inside a button is neither
+              valid nor reliably clickable. */}
+          <div className="flex justify-end border-b border-line px-4 py-2">
+            <button
+              type="button"
+              onClick={() => download(filename([exam.paper, "by question"]), examCSV(exam))}
+              className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[11.5px] font-semibold text-body transition-colors hover:bg-raised"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </button>
+          </div>
+
           {/* One script is one student, and calling that a class average would
               be a lie the teacher cannot see through — so it says so. */}
           {exam.scripts === 1 ? (

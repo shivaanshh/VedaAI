@@ -119,6 +119,43 @@ export async function updateAssessment(
   );
   return assessment;
 }
+/**
+ * Saves the teacher's correction to one question.
+ *
+ * `answerBlockId` is deliberately awkward to pass by accident: omit the key to
+ * leave the matcher's decision alone, and pass an explicit null to say nothing
+ * on the sheet answers this. JSON.stringify drops undefined values, so an
+ * omitted key really does arrive omitted.
+ */
+export async function saveReview(
+  id: string,
+  patch: {
+    questionId: string;
+    awarded?: number | null;
+    note?: string | null;
+    answerBlockId?: string | null;
+  }
+): Promise<AssessmentRecord> {
+  const { assessment } = await request<{ assessment: AssessmentRecord }>(
+    `/api/assessments/${id}/review`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }
+  );
+  return assessment;
+}
+
+/** Removes the correction, restoring what the model decided. */
+export async function clearReview(id: string, questionId: string): Promise<AssessmentRecord> {
+  const { assessment } = await request<{ assessment: AssessmentRecord }>(
+    `/api/assessments/${id}/review?questionId=${encodeURIComponent(questionId)}`,
+    { method: "DELETE" }
+  );
+  return assessment;
+}
+
 
 export async function deleteAssessment(id: string): Promise<void> {
   await request(`/api/assessments/${id}`, { method: "DELETE" });
