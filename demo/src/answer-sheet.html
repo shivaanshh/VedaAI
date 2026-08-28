@@ -1,0 +1,170 @@
+<meta charset="utf-8">
+<title>Answer sheet</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #fff; }
+
+  /* A scanned school answer script: cream paper, blue rules, red margin. */
+  .page {
+    width: 210mm; height: 297mm;
+    position: relative;
+    page-break-after: always;
+    background: #fdfdf8;
+    overflow: hidden;
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* Ruled lines. 9mm apart, which is also the writing line-height. */
+  .rules {
+    position: absolute; inset: 0;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0, transparent 8.6mm,
+      #b9cfe4 8.6mm, #b9cfe4 8.75mm
+    );
+    background-position: 0 22mm;
+  }
+  .margin-line { position: absolute; top: 0; bottom: 0; left: 26mm; width: .5mm; background: #e9a8a8; }
+
+  /* The ink layer. Rotated a fraction of a degree per page, the way a
+     sheet sits crooked on a flatbed. */
+  .ink {
+    position: absolute; inset: 0;
+    padding: 24mm 16mm 14mm 31mm;
+    font-family: "Ink Free", "Segoe Print", "Bradley Hand", cursive;
+    font-size: 21.5px;
+    line-height: 8.75mm;
+    color: #1c3f8f;
+  }
+  .p1 .ink { transform: rotate(-0.35deg); }
+  .p2 .ink { transform: rotate(0.5deg); }
+  .p3 .ink { transform: rotate(-0.2deg); }
+
+  /* Per-line jitter: real writing does not share one baseline or one slant. */
+  .l { display: block; white-space: pre-wrap; }
+  .l:nth-child(3n)   { transform: rotate(0.25deg)  translateX(1px); }
+  .l:nth-child(4n)   { transform: rotate(-0.3deg)  translateX(-1px); letter-spacing: .18px; }
+  .l:nth-child(5n)   { transform: rotate(0.15deg); letter-spacing: -.12px; }
+  .l:nth-child(7n)   { transform: rotate(-0.15deg) translateX(2px); }
+
+  .lbl { font-weight: bold; letter-spacing: .3px; text-decoration: underline; text-underline-offset: 3px; }
+  .gap { display: block; height: 8.75mm; }
+  .strike { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+  .small { font-size: 19px; }
+  .dark { color: #16306e; }          /* a line written with a fresher pen */
+  .pgno { position: absolute; bottom: 8mm; right: 18mm; font-family: "Ink Free", cursive; font-size: 18px; color: #1c3f8f; }
+
+  .hdr { position: absolute; top: 8mm; left: 31mm; right: 16mm; font-family: "Ink Free", cursive; font-size: 19px; color: #1c3f8f; display: flex; justify-content: space-between; }
+
+  body:has(.page:target) .page { display: none; }
+  body:has(.page:target) .page:target { display: block; }
+</style>
+
+<!-- ─────────────────────────── PAGE 1 ─────────────────────────── -->
+<div class="page p1" id="pg1">
+  <div class="rules"></div>
+  <div class="margin-line"></div>
+  <div class="hdr"><span>Name : Ishaan Verma</span><span>Class : IX - B</span><span>Roll No. 24</span></div>
+  <div class="ink">
+    <span class="l"><span class="lbl">Ans 1.</span></span>
+    <span class="l">Inertia is the property of a body due to which it</span>
+    <span class="l">resists any change in its state of rest or of uniform</span>
+    <span class="l">motion in a straight line.</span>
+    <span class="gap"></span>
+
+    <span class="l"><span class="lbl">Ans 2.</span></span>
+    <span class="l">Newton's third law states that to every action there</span>
+    <span class="l">is an equal and opposite reaction. The action and</span>
+    <span class="l">reaction act on two different bodies.</span>
+    <span class="gap"></span>
+
+    <span class="l"><span class="lbl">Ans 4.</span></span>
+    <span class="l">Mass is the amount of <span class="strike">force</span> matter present in a</span>
+    <span class="l">body and it is measured in kg. Weight is the force</span>
+    <span class="l">with which the earth pulls the body and it is also</span>
+    <span class="l">measured in kg.</span>
+    <span class="gap"></span>
+
+    <span class="l"><span class="lbl">Q 3 (b)</span></span>
+    <span class="l">Given, m = 5 kg , v = 4 m/s</span>
+    <span class="l">Momentum p = m + v</span>
+    <span class="l">= 5 + 4 = 9 kg m/s</span>
+  </div>
+  <div class="pgno">1</div>
+</div>
+
+<!-- ─────────────────────────── PAGE 2 ─────────────────────────── -->
+<div class="page p2" id="pg2">
+  <div class="rules"></div>
+  <div class="margin-line"></div>
+  <div class="ink">
+    <span class="l"><span class="lbl">3 (a)</span></span>
+    <span class="l">The SI unit of momentum is kg m/s.</span>
+    <span class="gap"></span>
+
+    <span class="l"><span class="lbl">Ans 6 (ii)</span></span>
+    <span class="l">When a bullet is fired from a gun, the gun moves</span>
+    <span class="l">backward. This backward movement is called recoil</span>
+    <span class="l">and it happens because of conservation of momentum.</span>
+    <span class="gap"></span>
+
+    <span class="l"><span class="lbl">6 (i)</span></span>
+    <span class="l">The law of conservation of momentum says that when</span>
+    <span class="l">no external force acts on a system, the total momentum</span>
+    <span class="l">of the system before collision is equal to the total</span>
+    <span class="l">momentum after the collision.</span>
+    <span class="gap"></span>
+
+    <span class="l"><span class="lbl">Ans 5.</span></span>
+    <span class="l">The fielder lowers his hands so that the ball takes</span>
+    <span class="l">more time to stop. As the time increases, the rate of</span>
+    <span class="l">change of momentum decreases, so the force on his</span>
+    <span class="l">hands becomes less and he does not get hurt.</span>
+    <span class="gap"></span>
+
+    <span class="l dark"><span class="lbl">Ans 7.</span></span>
+    <span class="l dark">Given : F = 10 N , m = 2 kg , u = 0 , t = 3 s</span>
+    <span class="l dark">We know that F = m a</span>
+  </div>
+  <div class="pgno">2</div>
+</div>
+
+<!-- ─────────────────────────── PAGE 3 ─────────────────────────── -->
+<div class="page p3" id="pg3">
+  <div class="rules"></div>
+  <div class="margin-line"></div>
+  <div class="ink">
+    <span class="l dark">So a = F / m = 10 / 2</span>
+    <span class="l dark">a = 5 m/s<sup>2</sup></span>
+    <span class="l dark">Now using v = u + a t</span>
+    <span class="l dark">v = 0 + 5 &times; 3 = 15 m/s</span>
+    <span class="l dark">Hence acceleration is 5 m/s<sup>2</sup> and velocity after</span>
+    <span class="l dark">3 seconds is 15 m/s.</span>
+    <span class="gap"></span>
+
+    <span class="l"><span class="lbl">Ans 8.</span></span>
+    <span class="l">When a body moves on a circular path with a constant</span>
+    <span class="l">speed, its motion is called uniform circular motion.</span>
+    <span class="l">The direction of velocity keeps changing at every</span>
+    <span class="l">point. Example - the motion of the moon around</span>
+    <span class="l">the earth.</span>
+    <span class="gap"></span>
+
+    <span class="l"><span class="lbl">Ans 10.</span></span>
+    <span class="l">(1) When a bus starts suddenly, the passengers fall</span>
+    <span class="l">backward because the lower part of the body moves</span>
+    <span class="l">with the bus but the upper part remains at rest.</span>
+    <span class="l">(2) Dust particles come out when we beat a carpet</span>
+    <span class="l">with a stick.</span>
+    <span class="gap"></span>
+
+    <span class="l small">Rough -</span>
+    <span class="l small">10 &divide; 2 = 5</span>
+    <span class="l small">5 &times; 3 = 15</span>
+    <span class="gap"></span>
+
+    <span class="l small">Sir, I could not attempt Q9 as the time was over.</span>
+  </div>
+  <div class="pgno">3</div>
+</div>

@@ -1,0 +1,31 @@
+{
+  "name": "veda-assessment-mapper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Upload a question paper and a handwritten answer sheet; extract, map and highlight answers region-by-region.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "postinstall": "node scripts/copy-pdf-worker.mjs",
+    "test": "tsc lib/normalize.ts lib/mapping.ts lib/job.ts lib/types.ts lib/cohort.ts lib/display.ts lib/exam.ts server/services/lock.ts --rootDir . --outDir .test-build --module commonjs --target es2020 --skipLibCheck && node tests/run.cjs"
+  },
+  "dependencies": {
+    "next": "14.2.35",
+    "pdfjs-dist": "4.4.168",
+    "pg": "^8.23.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.3"
+  }
+}

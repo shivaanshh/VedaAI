@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Light chrome, because the scanned page is white and the design keeps the
+ * interface on the same plane as the paper rather than behind it.
+ *
+ * Two colours are load-bearing. Orange means "selected". Green means "this is
+ * the answer" — it is the region highlight and nothing else. Neither is used
+ * decoratively, so wherever the eye catches one, it carries that meaning.
+ */
+
+:root {
+  color-scheme: light;
+
+  --font-ui: "Figtree";
+  --font-display: "Bricolage Grotesque";
+  --font-mono: "Fragment Mono";
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: #f1f1f1;
+  color: #1a1a1a;
+  font-family: var(--font-ui), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* The heading treatment lifted from the VedaAI brand: the subject of the
+   sentence sits in orange on a soft orange plate. */
+.mark-brand {
+  background: #ffede4;
+  color: #fc5e24;
+  border-radius: 8px;
+  padding: 0.06em 0.36em 0.14em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* Question references are identifiers: "11(a)" and "11(b)" differ by one
+   glyph, and a fixed advance puts that difference in the same column. */
+.ref {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-ligatures: none;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #dcdcdc;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c4c4c4;
+  background-clip: content-box;
+}
+
+:focus-visible {
+  outline: 2px solid #fc5e24;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * Answer region highlighting
+ * ---------------------------------------------------------------- */
+
+/* The live match. Multiply keeps the handwriting readable THROUGH the wash
+   rather than veiled by it, which matters because the teacher is reading the
+   ink inside this rectangle. */
+.region-live {
+  background: rgba(34, 197, 94, 0.16);
+  mix-blend-mode: multiply;
+  border: 2px solid #22c55e;
+  border-radius: 4px;
+}
+
+/* Writing that answers nothing on the paper. Same shape, different meaning. */
+.region-orphan {
+  background: rgba(226, 59, 46, 0.12);
+  mix-blend-mode: multiply;
+  border: 2px dashed #e23b2e;
+  border-radius: 4px;
+}
+
+/* Every other located block, so the teacher can see the sheet has been read
+   even where they are not currently looking. */
+.region-idle {
+  border: 1px dashed rgba(0, 0, 0, 0.16);
+  border-radius: 4px;
+}
+
+/* The tab that names which question a highlight belongs to. Sits on the top
+   edge of its rectangle, flipping below when the region touches the page top. */
+.region-tag {
+  font-family: var(--font-ui), system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  padding: 3px 6px;
+  border-radius: 4px 4px 0 0;
+  white-space: nowrap;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
