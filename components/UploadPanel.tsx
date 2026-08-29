@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, Close, PdfMark, Upload } from "./icons";
 import { countPages } from "@/lib/pdf";
+import GuideTip from "./GuideTip";
 
 /**
  * The upload screen. Two drop zones, a primary action that stays inert until
@@ -265,6 +266,8 @@ export default function UploadPanel({
             {warning}
           </div>
         ) : null}
+
+        <GuideTip id="upload" className="mt-6" />
 
         <div className="mt-7 flex flex-col gap-3 sm:flex-row">
           <DropZone

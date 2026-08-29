@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import QuestionRail from "./QuestionRail";
 import SheetViewer from "./SheetViewer";
 import { fetchAssessment, toPageRefs } from "@/lib/api";
@@ -8,6 +8,7 @@ import { isTerminal } from "@/lib/job";
 import { resolve } from "@/lib/review";
 import { splitRef } from "@/lib/display";
 import type { AssessmentRecord } from "@/lib/types";
+import GuideTip from "./GuideTip";
 
 /**
  * The student's side of the same marked script.
@@ -34,6 +35,7 @@ export default function StudentView({ id }: { id: string }) {
   const [selectedOrphanId, setSelectedOrphanId] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<"questions" | "sheet">("questions");
   const [attempt, setAttempt] = useState(0);
+  const railRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,6 +107,29 @@ export default function StudentView({ id }: { id: string }) {
     setSelectedQuestionId(questionId);
     setMobileTab("sheet");
   }, []);
+
+  // Up/down walks the paper, exactly as it does for the teacher. A student
+  // reading back a marked script goes through it in order more often than they
+  // jump around, and the guide says the keys work — so they have to work here
+  // too, not only on the workspace.
+  useEffect(() => {
+    const questions = record?.questions ?? [];
+    if (!questions.length) return;
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      if (!railRef.current?.contains(document.activeElement)) return;
+
+      e.preventDefault();
+      const at = questions.findIndex((q) => q.id === selectedQuestionId);
+      const delta = e.key === "ArrowDown" ? 1 : -1;
+      const next = at === -1 ? 0 : Math.min(questions.length - 1, Math.max(0, at + delta));
+      selectQuestion(questions[next].id);
+    }
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [record, selectedQuestionId, selectQuestion]);
 
   const selectOrphan = useCallback((blockId: string) => {
     setSelectedQuestionId(null);
@@ -200,32 +225,46 @@ export default function StudentView({ id }: { id: string }) {
         </div>
 
         <div className="grid min-h-0 flex-1 gap-3 p-3 md:grid-cols-[minmax(320px,7fr)_9fr]">
-          <div className={`min-h-0 ${mobileTab === "questions" ? "" : "hidden"} md:block`}>
-            <QuestionRail
-              audience="student"
-              questions={record.questions}
-              blocks={record.blocks}
-              mappings={view.mappings}
-              grades={view.grades}
-              orphanBlockIds={view.orphanBlockIds}
-              reviews={record.reviews ?? []}
-              summary={record.summary}
-              selectedQuestionId={selectedQuestionId}
-              selectedOrphanId={selectedOrphanId}
-              onSelectQuestion={selectQuestion}
-              onSelectOrphan={selectOrphan}
-            />
+          <div
+            className={`flex min-h-0 flex-col gap-3 ${
+              mobileTab === "questions" ? "" : "hidden"
+            } md:flex`}
+          >
+            <GuideTip id="question-rail" />
+            <div ref={railRef} className="min-h-0 flex-1">
+              <QuestionRail
+                audience="student"
+                questions={record.questions}
+                blocks={record.blocks}
+                mappings={view.mappings}
+                grades={view.grades}
+                orphanBlockIds={view.orphanBlockIds}
+                reviews={record.reviews ?? []}
+                summary={record.summary}
+                selectedQuestionId={selectedQuestionId}
+                selectedOrphanId={selectedOrphanId}
+                onSelectQuestion={selectQuestion}
+                onSelectOrphan={selectOrphan}
+              />
+            </div>
           </div>
 
-          <div className={`min-h-0 ${mobileTab === "sheet" ? "" : "hidden"} md:block`}>
-            <SheetViewer
-              pages={answerPages}
-              blocks={record.blocks}
-              activeBlockId={activeBlockId}
-              orphanBlockIds={view.orphanBlockIds}
-              blockLabels={blockLabels}
-              emptyNotice={emptyNotice}
-            />
+          <div
+            className={`flex min-h-0 flex-col gap-3 ${
+              mobileTab === "sheet" ? "" : "hidden"
+            } md:flex`}
+          >
+            <GuideTip id="highlight" />
+            <div className="min-h-0 flex-1">
+              <SheetViewer
+                pages={answerPages}
+                blocks={record.blocks}
+                activeBlockId={activeBlockId}
+                orphanBlockIds={view.orphanBlockIds}
+                blockLabels={blockLabels}
+                emptyNotice={emptyNotice}
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { Clock, Sparkle, Trash } from "@/components/icons";
 import { deleteAssessment, fetchHealth, listAssessments, type Health } from "@/lib/api";
 import { RUN_STATE_LABEL, runState, timeAgo } from "@/lib/display";
 import type { AssessmentSummary } from "@/lib/types";
+import GuideTip from "@/components/GuideTip";
 
 /**
  * Every script marked so far.
@@ -73,6 +74,8 @@ export default function HistoryRoute() {
               Mark a new script
             </Link>
           </div>
+
+          <GuideTip id="history" className="mt-5" />
 
           {health && !health.durable ? (
             <p className="mt-5 rounded-xl border border-warn/25 bg-warn-soft px-3.5 py-2.5 text-[12px] leading-relaxed text-warn">

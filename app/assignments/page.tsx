@@ -19,6 +19,7 @@ export default function AssignmentsRoute() {
       field="paper"
       copy={{
         nav: "assignments",
+        guide: "assignments",
         title: "Assignments",
         intro:
           "The papers you have marked against, with the class average on each. Open one to see every script that sat it.",

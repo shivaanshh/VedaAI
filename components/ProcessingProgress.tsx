@@ -3,6 +3,7 @@
 import { SparkleCluster } from "./icons";
 import { jobProgress, STEP_ORDER } from "@/lib/job";
 import type { JobState } from "@/lib/types";
+import GuideTip from "./GuideTip";
 
 /**
  * The design gives this screen a sparkle, a heading and one grey line, and
@@ -68,6 +69,8 @@ export default function ProcessingProgress({ job }: { job: JobState }) {
             Step {stepNumber} of {STEP_ORDER.length}
           </p>
         ) : null}
+
+        <GuideTip id="progress" className="mt-7 text-left" />
       </div>
     </div>
   );

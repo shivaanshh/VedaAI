@@ -10,6 +10,7 @@ import { hardest, type Exam, type ExamQuestion } from "@/lib/exam";
 import { timeAgo } from "@/lib/display";
 import { examCSV, filename } from "@/lib/csv";
 import { download } from "@/lib/download";
+import GuideTip from "@/components/GuideTip";
 
 /**
  * Exams — a paper broken open, one row per question.
@@ -69,6 +70,8 @@ export default function ExamsRoute() {
               Mark a new script
             </Link>
           </div>
+
+          <GuideTip id="exams" className="mt-5" />
 
           {error ? (
             <p className="mt-5 rounded-xl border border-bad/20 bg-bad-soft px-3.5 py-2.5 text-[12px] font-medium text-bad">

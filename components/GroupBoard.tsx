@@ -9,6 +9,8 @@ import { fmt, groupBy, percent, type GroupField } from "@/lib/cohort";
 import { RUN_STATE_LABEL, runState, timeAgo } from "@/lib/display";
 import type { NavKey } from "./Sidebar";
 import type { AssessmentSummary } from "@/lib/types";
+import GuideTip from "./GuideTip";
+import type { GuideId } from "@/lib/guide";
 
 /**
  * My Classroom and Assignments are the same board over the same history, read
@@ -23,6 +25,8 @@ import type { AssessmentSummary } from "@/lib/types";
 
 export interface BoardCopy {
   nav: NavKey;
+  /** Which explanation guide mode shows over this board. */
+  guide: GuideId;
   /** Page heading and the browser breadcrumb. */
   title: string;
   intro: string;
@@ -97,6 +101,8 @@ export default function GroupBoard({ field, copy }: { field: GroupField; copy: B
               Mark a new script
             </Link>
           </div>
+
+          <GuideTip id={copy.guide} className="mt-5" />
 
           {error ? (
             <p className="mt-5 rounded-xl border border-bad/20 bg-bad-soft px-3.5 py-2.5 text-[12px] font-medium text-bad">

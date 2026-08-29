@@ -23,6 +23,7 @@ import { Download } from "./icons";
 import { splitRef } from "@/lib/display";
 import type { ReviewPatch } from "./MarkEditor";
 import type { AssessmentRecord } from "@/lib/types";
+import GuideTip from "./GuideTip";
 
 /**
  * One marking run, from wherever it happens to be.
@@ -386,6 +387,13 @@ export default function Workspace({ id }: { id: string }) {
           <ShareLink id={id} />
         </div>
 
+        {record.grades.length > 0 ? (
+          <div className="grid gap-2 px-3 pt-3 md:grid-cols-2">
+            <GuideTip id="export" />
+            <GuideTip id="share" />
+          </div>
+        ) : null}
+
         {reviewError ? (
           <div className="flex items-start gap-2 border-b border-bad/30 bg-bad-soft/50 px-3 py-2">
             <p className="flex-1 text-[11.5px] font-medium text-bad">{reviewError}</p>
@@ -401,47 +409,60 @@ export default function Workspace({ id }: { id: string }) {
 
         <div className="grid min-h-0 flex-1 gap-3 p-3 md:grid-cols-[minmax(320px,7fr)_9fr]">
           <div
-            ref={railRef}
-            className={`min-h-0 ${mobileTab === "questions" ? "" : "hidden"} md:block`}
+            className={`flex min-h-0 flex-col gap-3 ${
+              mobileTab === "questions" ? "" : "hidden"
+            } md:flex`}
           >
-            <QuestionRail
-              questions={record.questions}
-              blocks={record.blocks}
-              mappings={view.mappings}
-              grades={view.grades}
-              orphanBlockIds={view.orphanBlockIds}
-              reviews={record.reviews ?? []}
-              summary={record.summary}
-              selectedQuestionId={selectedQuestionId}
-              selectedOrphanId={selectedOrphanId}
-              onSelectQuestion={selectQuestion}
-              onSelectOrphan={selectOrphan}
-              editing={
-                // Offered once there are marks to correct. Before grading there
-                // is nothing to disagree with, and an editor on an empty rail
-                // would only invite a teacher to grade the paper by hand.
-                record.grades.length > 0
-                  ? {
-                      modelGrades: record.grades,
-                      modelMappings: record.mappings,
-                      savingId,
-                      onSave: onSaveReview,
-                      onClear: onClearReview,
-                    }
-                  : undefined
-              }
-            />
+            <GuideTip id="question-rail" />
+            {/* The ref sits on the list, not on the column: the guide tip above it
+                is focusable, and arrow keys pressed there belong to the tip. */}
+            <div ref={railRef} className="min-h-0 flex-1">
+              <QuestionRail
+                questions={record.questions}
+                blocks={record.blocks}
+                mappings={view.mappings}
+                grades={view.grades}
+                orphanBlockIds={view.orphanBlockIds}
+                reviews={record.reviews ?? []}
+                summary={record.summary}
+                selectedQuestionId={selectedQuestionId}
+                selectedOrphanId={selectedOrphanId}
+                onSelectQuestion={selectQuestion}
+                onSelectOrphan={selectOrphan}
+                editing={
+                  // Offered once there are marks to correct. Before grading there
+                  // is nothing to disagree with, and an editor on an empty rail
+                  // would only invite a teacher to grade the paper by hand.
+                  record.grades.length > 0
+                    ? {
+                        modelGrades: record.grades,
+                        modelMappings: record.mappings,
+                        savingId,
+                        onSave: onSaveReview,
+                        onClear: onClearReview,
+                      }
+                    : undefined
+                }
+              />
+            </div>
           </div>
 
-          <div className={`min-h-0 ${mobileTab === "sheet" ? "" : "hidden"} md:block`}>
-            <SheetViewer
-              pages={answerPages}
-              blocks={record.blocks}
-              activeBlockId={activeBlockId}
-              orphanBlockIds={view.orphanBlockIds}
-              blockLabels={blockLabels}
-              emptyNotice={emptyNotice}
-            />
+          <div
+            className={`flex min-h-0 flex-col gap-3 ${
+              mobileTab === "sheet" ? "" : "hidden"
+            } md:flex`}
+          >
+            <GuideTip id="highlight" />
+            <div className="min-h-0 flex-1">
+              <SheetViewer
+                pages={answerPages}
+                blocks={record.blocks}
+                activeBlockId={activeBlockId}
+                orphanBlockIds={view.orphanBlockIds}
+                blockLabels={blockLabels}
+                emptyNotice={emptyNotice}
+              />
+            </div>
           </div>
         </div>
       </div>

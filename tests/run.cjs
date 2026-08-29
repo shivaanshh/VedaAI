@@ -35,6 +35,9 @@ const { runState, RUN_STATE_LABEL, scoreChip } = require("../.test-build/lib/dis
 const { buildExams, hardest } = require("../.test-build/lib/exam.js");
 const { resolve, verdictFor, isEmptyReview } = require("../.test-build/lib/review.js");
 const { cell, scriptCSV, filename } = require("../.test-build/lib/csv.js");
+const { GUIDE, GUIDE_IDS } = require("../.test-build/lib/guide.js");
+const fs = require("fs");
+const path = require("path");
 
 let pass = 0;
 let fail = 0;
@@ -1073,6 +1076,65 @@ group("filenames a filesystem will actually accept:");
   eq(filename([null, "Physics"]), "Physics.csv", "an unfiled script drops the empty part");
   eq(filename(["Class IX/A: Unit 2"]), "Class IX A Unit 2.csv", "slashes and colons are stripped");
   eq(filename([null, undefined, "  "]), "export.csv", "nothing usable still yields a file");
+}
+
+
+/* ------------------------------------------------------------------ *
+ * Guide mode
+ *
+ * The copy is data, so it can be checked like data. The two failures worth
+ * catching are silent ones: a tip whose id has a typo renders nothing at all
+ * and looks exactly like a tip that was never placed, and an explanation
+ * nobody references is copy that will drift out of date unnoticed.
+ * ------------------------------------------------------------------ */
+
+/** Every guide id actually referenced by a component, read off the source. */
+function placedGuideIds() {
+  const roots = ["app", "components"];
+  const found = new Set();
+
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (/\.tsx?$/.test(entry.name) && entry.name !== "GuideTip.tsx") {
+        const src = fs.readFileSync(full, "utf8");
+        // <GuideTip id="upload" …/> and the boards' copy.guide field.
+        for (const m of src.matchAll(/<GuideTip[^>]*\bid="([a-z-]+)"/g)) found.add(m[1]);
+        for (const m of src.matchAll(/\bguide:\s*"([a-z-]+)"/g)) found.add(m[1]);
+      }
+    }
+  };
+
+  for (const r of roots) walk(path.join(__dirname, "..", r));
+  return found;
+}
+
+group("every explanation is attached to something:");
+{
+  const placed = placedGuideIds();
+
+  for (const id of GUIDE_IDS) {
+    eq(placed.has(id), true, `"${id}" is placed on a screen`);
+  }
+
+  for (const id of placed) {
+    eq(Boolean(GUIDE[id]), true, `"${id}" is a real entry, not a typo`);
+  }
+}
+
+group("an explanation says why before it says how:");
+{
+  for (const id of GUIDE_IDS) {
+    const e = GUIDE[id];
+    eq(Boolean(e.title && e.why && e.how), true, `"${id}" fills all three fields`);
+    eq(e.why !== e.how, true, `"${id}" does not repeat itself`);
+    // `how` is an instruction, so it opens on a verb rather than on the
+    // feature's own name — "Press it to…" not "Export CSV lets you…".
+    eq(/^[A-Z][a-z]+/.test(e.how), true, `"${id}" starts its how with a word`);
+    eq(e.title.length <= 42, true, `"${id}" has a title short enough to sit in a rail`);
+  }
 }
 
 

@@ -17,6 +17,7 @@ Click a question on the left; the answer lights up on the right.
 - [The teacher overrules the model](#the-teacher-overrules-the-model)
 - [Finding one question in a long paper](#finding-one-question-in-a-long-paper)
 - [Taking the marks out of the app](#taking-the-marks-out-of-the-app)
+- [Guide mode](#guide-mode)
 - [Edge cases](#edge-cases)
 - [Running it](#running-it)
 - [Deploying](#deploying)
@@ -342,6 +343,47 @@ Rows come out in printed order with the mark that now stands, and a column sayin
 the teacher's or the model's — so the export answers the question a marks sheet is usually asked
 to answer.
 
+## Guide mode
+
+A teacher meets this app once, usually with a stack of scripts already waiting. The help popover
+in the top bar explains the product correctly and in one place — which is the problem: it explains
+the product in one corner, away from the thing it describes. Reading it means leaving the screen
+you are stuck on.
+
+Guide mode instead pins a one-line explanation **beside the control it explains** — fifteen of
+them, one per feature, on every screen. Each opens on a click into two sentences that answer
+different questions: *why this exists* and *what to do with it*. Both are needed. A teacher who
+reads only what a button does still has to work out whether it is worth pressing.
+
+It is **on the first time a browser opens the app** and off from the moment it is turned off,
+kept in `localStorage` per browser. One switch in the top bar clears every tip on the page at
+once, and the small x on any tip is that same switch rather than a per-tip dismissal — otherwise
+turning the guide off means fifteen clicks in fifteen places.
+
+Three decisions carry most of the design:
+
+**Collapsed until asked.** The first version rendered every explanation open, which put four
+paragraphs above the question list and pushed the actual marking below the fold. A guide that has
+to be turned off before the product is usable is one nobody will leave on. A titled line costs one
+row and says all it needs to: *there is an explanation here*.
+
+**Dashed and brand-tinted, a style used nowhere else.** Tips have to read as scaffolding that is
+about to be taken away, not as part of the interface. A solid panel in the product's own styling
+would have a teacher spending their first minute working out whether the orange box is a warning
+about their paper.
+
+**Shown where the feature is, and only when it is.** The rail toolbar tip appears only on papers
+long enough to grow a toolbar; the orphan tip only when there is unmatched writing; the mark
+editor tip only once a teacher opens the editor — explaining a correction at the moment they are
+making one, rather than on a screen where nothing is wrong yet. Turned off, the tips are absent
+from the DOM rather than hidden with CSS, so a screen reader walking a working session never meets
+tutorial copy.
+
+The copy lives in one file as data (`lib/guide.ts`), which is what lets the suite check it:
+that every explanation is placed on a screen, that every placement names a real one — a typo in an
+`id` renders nothing and looks exactly like a tip that was never added — and that no entry says
+the same thing twice in its two voices.
+
 ## Edge cases
 
 Every requirement in the brief, and where it is handled:
@@ -358,6 +400,7 @@ Every requirement in the brief, and where it is handled:
 | Display questions and answers side by side | Questions in printed order on the left, the answer sheet on the right, and the transcription of the matched answer under each question. |
 | Exact region highlighting | Single-render guarantee plus percentage coordinates. |
 | Answers spanning pages | `regions[]` is an array; blocks split across a request batch are rejoined by label, and the viewer scrolls to the first region so the teacher lands at the start of the answer. |
+| A teacher who has never seen this before | Guide mode: an explanation pinned beside each feature, on by default for a new browser, off in one click. |
 | Processing progress | Real per-batch progress, not a timed animation — the bar advances when a batch the server actually finished is written to the job record. |
 | A run interrupted part way | The job is persisted, so reloading `/a/<id>` resumes at the step it reached. A failure keeps everything extracted before it and offers *Resume from where it stopped*. |
 | The model marks something wrong | The teacher overrules it — mark, mapping or both — and the correction reaches the history card, both boards, the exam analysis and the student's copy at once, because all five resolve through one function. |
@@ -365,7 +408,7 @@ Every requirement in the brief, and where it is handled:
 
 ### Tests
 
-The logic that has to be right every time is covered by 207 assertions that need no API key and
+The logic that has to be right every time is covered by 297 assertions that need no API key and
 no network:
 
 ```bash
@@ -391,6 +434,11 @@ them sit the run-state rules, which decide whether a run that is not finished is
 has stopped, or was abandoned before a single page was ever uploaded.
 
 The corrections are covered hardest, because they are the one place a wrong answer would be the teacher's rather than the model's: that a script nobody has corrected comes back byte for byte as the model left it, that a mark above what a question carries is clamped rather than stored as given, that a note on its own does not disturb a mark, that moving an answer removes it from the orphan list and detaching one puts it back, that a review naming a block that no longer exists is ignored rather than obeyed, that verdicts are recomputed from the mark that now stands, and that a correction reaches the per-question board and not only the screen. Beside them sit the export rules: quote doubling, the formula guard, printed order, and filenames a filesystem will accept.
+
+Guide mode is checked as data rather than as rendering: the suite walks `app/` and
+`components/` for every `<GuideTip>` placement and asserts the two sets agree in both
+directions — no explanation written but never shown, no placement naming an entry that does
+not exist.
 
 Two of these guards exist because the test caught the bug. The roman-numeral guard stops `(iii)`
 becoming the number 111. And the mid-label repair exists because `canonicalize` splits digit runs
@@ -512,6 +560,8 @@ lib/                          shared by both sides; no I/O, no secrets
   csv.ts                      export formatting; the Excel hazards, handled
   download.ts                 hands the browser a file; the only DOM part of export
   profile.ts                  the display identity kept on this browser
+  guide.ts                    guide-mode copy, as data so it can be tested
+  guide-mode.ts               the on/off switch, kept per browser
 
 components/
   Shell.tsx                   sidebar + top bar + one scroll region
@@ -519,6 +569,7 @@ components/
   TopBar.tsx                  breadcrumb, help, notifications, phone drawer
   GroupBoard.tsx              one board; My Classroom and Assignments are it
   icons.tsx                   inline SVG set
+  GuideTip.tsx                one explanation, pinned beside what it explains
   UploadPanel.tsx             two drop zones, page counts, size guard
   ProcessingProgress.tsx      progress read from the job record
   Workspace.tsx               drives the run, then renders the result
@@ -527,7 +578,7 @@ components/
   MarkEditor.tsx              change a mark, move an answer, leave a note
   SheetViewer.tsx             page stack, overlay, zoom, scroll-to-answer
 
-tests/run.cjs                 207 logic assertions, no network needed
+tests/run.cjs                 297 logic assertions, no network needed
 scripts/copy-pdf-worker.mjs   puts the pdf.js worker at a stable URL
 ```
 
@@ -629,8 +680,12 @@ dot appearing only when there is something in it.
 button opens a drawer built from the sidebar's own nav list, so a destination cannot exist in one
 and not the other.
 
-Arrow keys walk the question list. Marking a stack of scripts is repetitive, and reaching for the
-mouse on every question makes it slower than it needs to be.
+Arrow keys walk the question list, in the student view as well as the teacher one. Marking a
+stack of scripts is repetitive, and reaching for the mouse on every question makes it slower than
+it needs to be; a student reading a marked script back goes through it in order too. The handler
+is scoped to the list rather than to the page, so it cannot fight the sheet's own scrolling, and
+it clamps at both ends rather than wrapping — arriving back at question 1 after the last one is
+never what the press meant.
 
 ## Staying inside the free tier
 
@@ -736,7 +791,7 @@ repository interface with two drivers — filesystem by default so the project c
 with no infrastructure, Postgres when `DATABASE_URL` is set — so past scripts stay in a library
 instead of vanishing on refresh. The same record is read by two views — the teacher workspace
 that drives the marking, and a read-only student result the teacher shares — so the roles differ
-in capability rather than behind a login the brief rules out. Because a marking tool the teacher cannot argue with will not be trusted, every mark and every match can be overruled, with the correction stored beside the model output rather than over it, so the change is reversible and every total in the app resolves through one function.
+in capability rather than behind a login the brief rules out. Because a marking tool the teacher cannot argue with will not be trusted, every mark and every match can be overruled, with the correction stored beside the model output rather than over it, so the change is reversible and every total in the app resolves through one function. And because the person meeting this tool for the first time is a teacher with a stack of scripts already waiting, an optional guide mode pins a one-line explanation beside each feature rather than filing them all in a help panel in the corner: on for a browser that has never been here, off in one click, and absent from the DOM rather than hidden when off.
 
 **Model.** Google Gemini (`gemini-3.6-flash` by default, configurable via `GEMINI_MODEL`).
 Chosen because it does handwriting transcription *and* returns bounding boxes in a single call —

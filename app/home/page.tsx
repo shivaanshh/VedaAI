@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Shell from "@/components/Shell";
+import GuideTip from "@/components/GuideTip";
 import { Clock, Library, Sparkle } from "@/components/icons";
 import { fetchHealth, listAssessments, type Health } from "@/lib/api";
 import { RUN_STATE_LABEL, runState, timeAgo } from "@/lib/display";
@@ -65,6 +66,8 @@ export default function HomeRoute() {
               Mark a new script
             </Link>
           </div>
+
+          <GuideTip id="home" className="mt-5" />
 
           {health && !health.durable ? (
             <p className="mt-5 rounded-xl border border-warn/25 bg-warn-soft px-3.5 py-2.5 text-[12px] leading-relaxed text-warn">

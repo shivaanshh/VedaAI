@@ -5,6 +5,7 @@ import MarkEditor, { type ReviewPatch } from "./MarkEditor";
 import { Check, ChevronDown, Search, Sparkle } from "./icons";
 import { CHIP_CLASS, scoreChip, splitRef } from "@/lib/display";
 import type { AnswerBlock, Grade, Mapping, Question, Review } from "@/lib/types";
+import GuideTip from "./GuideTip";
 
 /**
  * The extracted paper, in printed order, never re-sorted.
@@ -271,6 +272,7 @@ export default function QuestionRail({
 
         {showToolbar ? (
           <div className="mt-2.5">
+            <GuideTip id="rail-toolbar" compact className="mb-2.5" />
             <div className="relative">
               <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
               <input
@@ -512,18 +514,21 @@ export default function QuestionRail({
                       ) : null}
 
                       {editing ? (
-                        <MarkEditor
-                          question={q}
-                          grade={grade ?? null}
-                          modelGrade={modelGradeByQuestion.get(q.id) ?? null}
-                          review={review}
-                          blocks={blocks}
-                          currentBlockId={mapping?.answerBlockId ?? null}
-                          modelBlockId={modelMappingByQuestion.get(q.id)?.answerBlockId ?? null}
-                          busy={editing.savingId === q.id}
-                          onSave={(patch) => editing.onSave(q.id, patch)}
-                          onClear={() => editing.onClear(q.id)}
-                        />
+                        <>
+                          <GuideTip id="mark-editor" compact className="mt-2.5" />
+                          <MarkEditor
+                            question={q}
+                            grade={grade ?? null}
+                            modelGrade={modelGradeByQuestion.get(q.id) ?? null}
+                            review={review}
+                            blocks={blocks}
+                            currentBlockId={mapping?.answerBlockId ?? null}
+                            modelBlockId={modelMappingByQuestion.get(q.id)?.answerBlockId ?? null}
+                            busy={editing.savingId === q.id}
+                            onSave={(patch) => editing.onSave(q.id, patch)}
+                            onClear={() => editing.onClear(q.id)}
+                          />
+                        </>
                       ) : null}
                     </div>
                   ) : null}
@@ -538,6 +543,7 @@ export default function QuestionRail({
             <div className="px-4">
               <h3 className="text-[12px] font-bold text-bad">{copy.orphanTitle}</h3>
               <p className="mt-0.5 text-[11px] text-mute">{copy.orphanNote}</p>
+              <GuideTip id="orphans" compact className="mt-2" />
             </div>
             <ul className="mt-1.5 pb-2">
               {visibleOrphans.map((b) => (

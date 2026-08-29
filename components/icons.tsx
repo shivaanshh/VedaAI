@@ -134,6 +134,15 @@ export const ChevronsRight = ({ className }: P) => (
   </Svg>
 );
 
+/** Guide mode. A lamp rather than a question mark, so it reads as "show me"
+ *  rather than "explain the product" — the Help control beside it is the second. */
+export const Bulb = ({ className }: P) => (
+  <Svg className={className}>
+    <path d="M9.2 16.5a5.5 5.5 0 1 1 5.6 0v1.3a1.2 1.2 0 0 1-1.2 1.2h-3.2a1.2 1.2 0 0 1-1.2-1.2Z" />
+    <path d="M10.2 21.2h3.6" />
+  </Svg>
+);
+
 export const Help = ({ className }: P) => (
   <Svg className={className}>
     <circle cx="12" cy="12" r="9" />

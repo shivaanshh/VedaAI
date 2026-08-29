@@ -16,6 +16,7 @@ export default function ClassroomRoute() {
       field="student"
       copy={{
         nav: "classroom",
+        guide: "classroom",
         title: "My Classroom",
         intro:
           "Everyone whose script you have marked, with their average across every paper. Open a student to see each script and reopen the marking on it.",

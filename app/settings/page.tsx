@@ -6,6 +6,7 @@ import Shell from "@/components/Shell";
 import { deleteAssessment, fetchHealth, listAssessments, type Health } from "@/lib/api";
 import { DEFAULT_PROFILE, useProfile, type Profile } from "@/lib/profile";
 import type { AssessmentSummary } from "@/lib/types";
+import GuideTip from "@/components/GuideTip";
 
 /**
  * Settings — the things about this build that are genuinely settable, and the
@@ -68,6 +69,8 @@ export default function SettingsRoute() {
             How you are shown in the app, where your marking is stored, and which model reads the
             scripts.
           </p>
+
+          <GuideTip id="settings" className="mt-5" />
 
           {error ? (
             <p className="mt-5 rounded-xl border border-bad/20 bg-bad-soft px-3.5 py-2.5 text-[12px] font-medium text-bad">

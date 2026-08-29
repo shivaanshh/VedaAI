@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { NAV, type NavKey } from "./Sidebar";
-import { ArrowLeft, Bell, ChevronDown, Close, Exams, Help, Menu, Settings, Sparkle } from "./icons";
+import { ArrowLeft, Bell, Bulb, ChevronDown, Close, Exams, Help, Menu, Settings, Sparkle } from "./icons";
 import { listAssessments } from "@/lib/api";
+import { useGuide } from "@/lib/guide-mode";
 import { initials, useProfile } from "@/lib/profile";
 import type { AssessmentSummary } from "@/lib/types";
 
@@ -75,6 +76,7 @@ export default function TopBar({ current, backHref, label = "Exams" }: Props) {
 
         <div className="flex-1" />
 
+        <GuideToggle />
         <HelpMenu />
         <Notifications />
 
@@ -244,6 +246,39 @@ function Popover({
 }
 
 /* ------------------------------------------------------------------ */
+/* Guide mode                                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Turns the explanations beside each feature on and off.
+ *
+ * Separate from the help popover next to it on purpose. The popover answers
+ * "what is this product", once, in one place. This answers "what is this
+ * control I am looking at", everywhere, and stays on until it is turned off —
+ * which is why it is a pressed state rather than a menu.
+ */
+function GuideToggle() {
+  const { on, toggle } = useGuide();
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={on}
+      aria-label={on ? "Turn off guide mode" : "Turn on guide mode"}
+      title={on ? "Guide mode is on" : "Guide mode: explain each feature"}
+      className={`hidden rounded-md p-1.5 transition-colors md:block ${
+        on
+          ? "bg-brand-soft text-brand"
+          : "text-mute hover:bg-raised hover:text-ink"
+      }`}
+    >
+      <Bulb className="h-[18px] w-[18px]" />
+    </button>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Help                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -257,6 +292,7 @@ function Popover({
  */
 function HelpMenu() {
   const [open, setOpen] = useState(false);
+  const { on: guideOn, setOn: setGuideOn } = useGuide();
   const close = useCallback(() => setOpen(false), []);
 
   return (
@@ -327,6 +363,27 @@ function HelpMenu() {
             </li>
             <li>Share with student hands over a read-only copy of the result.</li>
           </ul>
+        </div>
+
+        <div className="border-t border-line px-4 py-3">
+          <button
+            type="button"
+            onClick={() => {
+              setGuideOn(!guideOn);
+              close();
+            }}
+            className="flex w-full items-start gap-2.5 rounded-lg p-2 text-left transition-colors hover:bg-raised"
+          >
+            <Bulb className="mt-px h-[15px] w-[15px] shrink-0 text-brand" />
+            <span className="min-w-0">
+              <span className="block text-[12px] font-bold text-ink">
+                {guideOn ? "Turn off guide mode" : "Turn on guide mode"}
+              </span>
+              <span className="mt-0.5 block text-[11.5px] leading-relaxed text-mute">
+                Explains each feature next to the control itself, on every screen.
+              </span>
+            </span>
+          </button>
         </div>
       </Popover>
     </div>
